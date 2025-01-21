@@ -1,0 +1,9 @@
+Flask
+flask_wtf
+flask-csp
+jsonschema
+requests
+flask_cors
+flask_limiter
+python-dotenv
+brotli
