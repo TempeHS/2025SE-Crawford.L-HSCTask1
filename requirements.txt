@@ -9,4 +9,4 @@ python-dotenv
 brotli
 bcrypt
 flask-talisman
-uuid7
+email-validator
