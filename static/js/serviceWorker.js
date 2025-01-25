@@ -2,12 +2,15 @@ const assets = [
 	"/",
 	"/index.html",
 	"/static/css/style.css",
+	"/static/css/bootstrap.min.css",
 	"/static/js/app.js",
+	"/static/js/bootstrap.bundle.min.js",
 	"/static/js/serviceWorker.js",
 	"/static/manifest.json",
 	"/templates/index.html",
 	"/templates/layout.html",
-	"/templates/partials/navbar.html"
+	"/templates/partials/navbar.html",
+	"/templates/partials/register.html",
     /* add other files that are loaded here (both code files and images) */,
 ],
 	CATALOGUE_ASSETS = "catalogue-assets";

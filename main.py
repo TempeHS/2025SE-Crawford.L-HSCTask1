@@ -4,6 +4,8 @@ from flask_wtf import CSRFProtect
 from flask_csp.csp import csp_header
 import logging
 import register_manager as rm
+import os
+from forms import RegistrationForm, LoginForm
 
 app_log = logging.getLogger(__name__)
 logging.basicConfig(
@@ -48,21 +50,48 @@ def index():
 
 
 @app.route("/register", methods=["GET", "POST"])
+@csp_header(
+    csp=csp,
+)
 def register():
-    if request.method == "POST":
-        username = request.form.get("username")
-        email = request.form.get("email")
-        password = request.form.get("password")
+    form = RegistrationForm()
+    if form.validate_on_submit():
+        username = form.username.data
+        email = form.email.data
+        password = form.password.data
 
         rm.create_user(username, email, password)
         return redirect("/register_success", 302)
 
-    return render_template("register.html")
+    return render_template("register.html", form=form)
 
 
 @app.route("/register_success", methods=["GET"])
 def register_success():
     return "User created successfully"
+
+
+@app.route("/login", methods=["GET", "POST"])
+@csp_header(
+    csp=csp,
+)
+def login():
+    form = LoginForm()
+    if form.validate_on_submit():
+        username = form.username.data
+        password = form.password.data
+
+        if rm.checkPW(username, password):
+            return redirect("/login_success", 302)
+        else:
+            return jsonify({"error": "Invalid username or password"}), 401
+
+    return render_template("login.html", form=form)
+
+
+@app.route("/login_success", methods=["GET"])
+def login_success():
+    return "Login successful"
 
 
 if __name__ == "__main__":
