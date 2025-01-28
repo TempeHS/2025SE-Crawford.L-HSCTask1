@@ -1,4 +1,4 @@
-from flask import Flask, redirect, render_template, request, jsonify, session
+from flask import Flask, redirect, render_template, request, jsonify, session, g
 from flask_session import Session
 import requests
 from flask_wtf import CSRFProtect
@@ -8,6 +8,7 @@ import register_manager as rm
 import os
 from forms import RegistrationForm, LoginForm
 from flask_wtf.csrf import generate_csrf
+from flask_talisman import Talisman, ALLOW_FROM
 
 app_log = logging.getLogger(__name__)
 logging.basicConfig(
@@ -28,21 +29,30 @@ app.config["SESSION_PERMANENT"] = False
 app.config["PERMANENT_SESSION_LIFETIME"] = 3600  # 1 hour
 Session(app)
 
-global csp
+# Flask-Talisman configuration
 csp = {
-    "default-src": "'self'",
-    "style-src": "'self' https://cdn.jsdelivr.net/",
-    "script-src": "'self' https://cdn.jsdelivr.net/",
-    "img-src": "'self' data: *",
-    "media-src": "'self'",
-    "font-src": "'self' data:",
-    "connect-src": "'self'",
-    "object-src": "'self'",
-    "worker-src": "'self'",
-    "frame-src": "'none'",
-    "form-action": "'self'",
-    "manifest-src": "'self'",
+    "default-src": ["'self'"],
+    "style-src": ["'self'", "https://cdn.jsdelivr.net/"],
+    "script-src": ["'self'", "https://cdn.jsdelivr.net/", "'nonce-{nonce}'"],
+    "img-src": ["'self'", "data:"],
+    "media-src": ["'self'"],
+    "font-src": ["'self'", "data:"],
+    "connect-src": ["'self'"],
+    "object-src": ["'self'"],
+    "worker-src": ["'self'"],
+    "frame-src": ["'none'"],
+    "form-action": ["'self'"],
+    "manifest-src": ["'self'"],
 }
+
+talisman = Talisman(
+    app, content_security_policy=csp, content_security_policy_nonce_in=["script-src"]
+)
+
+
+@app.context_processor
+def inject_nonce():
+    return dict(csp_nonce=talisman._get_nonce())
 
 
 @app.route("/index.html", methods=["GET"])
@@ -140,6 +150,20 @@ def logout():
     session.pop("username", None)
     app_log.debug(f"Session state after logout: {session}")
     return redirect("/")
+
+
+@app.route("/change-password", methods=["GET"])
+@csp_header(
+    csp=csp,
+)
+def change_password():
+    if "username" in session:
+        username = session["username"]
+        new_password = request.form["new_password"]
+        if rm.changePW(username, new_password):
+            return jsonify({"message": "Password changed successfully"})
+        return jsonify({"error": "Password change failed"}), 500
+    return jsonify({"error": "No session found"}), 404
 
 
 if __name__ == "__main__":
