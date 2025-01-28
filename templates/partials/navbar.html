@@ -1,4 +1,4 @@
-<nav class="navbar navbar-expand-lg bg-body-tertiary">
+<nav class="navbar navbar-expand-lg">
 	<div class="container-fluid">
 		<a class="navbar-brand" href="/">Navbar</a>
 		<div class="d-flex align-items-center order-lg-2">
@@ -13,15 +13,22 @@
 		</div>
 		<div class="collapse navbar-collapse order-lg-1" id="navbarNav">
 			<ul class="navbar-nav me-auto mb-2 mb-lg-0">
+				{% if 'username' not in session %}
 				<li class="nav-item">
 					<a class="nav-link" href="./register">Register</a>
 				</li>
+				{% endif %}
 				<li class="nav-item">
-					<a class="nav-link" href="#">Pricing</a>
+					<a class="nav-link {% if 'username' in session %} disabled {% endif %}" href="./login">Login</a>
 				</li>
-				<li class="nav-item">
-					<a class="nav-link disabled" aria-disabled="true">Disabled</a>
+				<li>
+					<a class="nav-link" href="./get-session">Get Session</a>
 				</li>
+				{% if 'username' in session %}
+				<li>
+					<a class="nav-link" href="./logout">Log Out</a>
+				</li>
+				{% endif %}
 			</ul>
 		</div>
 	</div>

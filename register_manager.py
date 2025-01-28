@@ -46,55 +46,37 @@ def create_user(username, email, password):
         else:
             continue
     cur.execute(
-        "INSERT INTO e50PMSBi_users (Wj89c_uuid, vX8hR_username, email, D9K66_password) VALUES (?, ?, ?, ?)",
-        (user_id, username, hashed_password.decode()),
+        "INSERT INTO e50PMSBi_users (Wj89c_uuid, vX8hR_username, ajkSC_email, D9K66_password) VALUES (?, ?, ?, ?)",
+        (user_id, username, email, hashed_password.decode()),
     )
     con.commit()
     con.close()
     return jsonify({"message": "User created successfully"}), 201
 
 
-def checkPW():
+def checkPW(username, password):
     if not os.path.exists(app.config["DATABASE"]):
         print("Error: Database does not exist.")
-        return jsonify({"error": "Internal server error"}), 500
-
-    username = request.form.get("username")
-    password = request.form.get("password")
-
-    if not username or not password:
-        print("Error: Username or password not provided.")
-        return jsonify({"error": "Username or password not provided."}), 400
-
-    # Decoy delay before checking the database
-    time.sleep(round(random.uniform(0.2, 0.4), 3))
+        return False
 
     con = sql.connect(app.config["DATABASE"])
     cur = con.cursor()
 
     cur.execute(
-        "SELECT vX8hR_username, D9K66_password FROM e50PMSBi_users WHERE vX8hR_username = ?",
+        "SELECT D9K66_password FROM e50PMSBi_users WHERE vX8hR_username = ?",
         (username,),
     )
     user = cur.fetchone()
 
-    if user:
-        # Decoy delay before checking the password
-        time.sleep(round(random.uniform(0.2, 0.4), 3))
-        if bcrypt.checkpw(password.encode("utf-8"), user[1].encode("utf-8")):
-            print("Password matched")
-        else:
-            time.sleep(
-                round(random.uniform(0.2, 0.4), 3)
-            )  # Decoy delay before printing password mismatch
-            print("Password did not match")
+    if user and bcrypt.checkpw(password.encode("utf-8"), user[0].encode("utf-8")):
+        print("Password matched")
+        con.close()
+        return True
     else:
-        time.sleep(
-            round(random.uniform(0.2, 0.4), 3)
-        )  # Decoy delay before printing username mismatch
-        print("Username did not match")
-
-    con.close()
+        time.sleep(round(random.uniform(0.2, 0.4), 3))  # Decoy delay
+        print("Password did not match")
+        con.close()
+        return False
 
 
 def changePW():
