@@ -10,3 +10,5 @@ brotli
 bcrypt
 flask-talisman
 email-validator
+flask-session
+pytest
