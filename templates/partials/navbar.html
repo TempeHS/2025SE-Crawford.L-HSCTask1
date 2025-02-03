@@ -21,27 +21,10 @@
 				<li class="nav-item">
 					<a class="nav-link {% if 'username' in session %} disabled {% endif %}" href="./login">Login</a>
 				</li>
-				{% if 'username' in session %}
 				<li>
 					<a class="nav-link" href="./get-session">Get Session</a>
 				</li>
-				<li class="nav-item dropdown">
-					<a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"
-						aria-expanded="false">
-						Posts
-					</a>
-					<ul class="dropdown-menu">
-						<li>
-							<a class="nav-link" href="./posts">Posts</a>
-						</li>
-						<li>
-							<a class="nav-link" href="./create-post">Create Post</a>
-						</li>
-					</ul>
-				</li>
-				<li>
-					<a class="nav-link" href="./change-password">Change Password</a>
-				</li>
+				{% if 'username' in session %}
 				<li>
 					<a class="nav-link" href="./logout">Log Out</a>
 				</li>
