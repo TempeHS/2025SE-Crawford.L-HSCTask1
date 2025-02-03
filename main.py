@@ -4,11 +4,12 @@ import requests
 from flask_wtf import CSRFProtect
 from flask_csp.csp import csp_header
 import logging
-import register_manager as rm
 import os
-from forms import RegistrationForm, LoginForm
 from flask_wtf.csrf import generate_csrf
 from flask_talisman import Talisman, ALLOW_FROM
+
+import register_manager as rm
+import forms
 
 app_log = logging.getLogger(__name__)
 logging.basicConfig(
@@ -50,6 +51,11 @@ talisman = Talisman(
 )
 
 
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template("404.html"), 404
+
+
 @app.context_processor
 def inject_nonce():
     return dict(csp_nonce=talisman._get_nonce())
@@ -70,26 +76,19 @@ def index():
 
 
 @app.route("/register", methods=["GET", "POST"])
-@csp_header(
-    csp=csp,
-)
 def register():
-    form = RegistrationForm()
-    if form.validate_on_submit():
-        username = form.username.data
-        email = form.email.data
-        password = form.password.data
-
+    if request.method == "POST":
+        username = request.form.get("username")
+        email = request.form.get("email")
+        password = request.form.get("password")
         response, status_code = rm.create_user(username, email, password)
-        if status_code == 200:
-            session.clear()  # Clear the old session
-            session["username"] = username  # Set the new session data
-            csrf_token = generate_csrf()  # Generate the CSRF token
-            app_log.debug(f"CSRF token after registration: {csrf_token}")
-            app_log.debug(f"Session state after registration: {session}")
-            return redirect("/register_success", 302)
-
-    return render_template("register.html", form=form)
+        if status_code == 201:
+            qr_code_data = response.json.get("qr_code_data")
+            return render_template(
+                "register/register_success.html", qr_code_data=qr_code_data
+            )
+        return response, status_code
+    return render_template("register/register.html", form=forms.RegistrationForm())
 
 
 @app.route("/register_success", methods=["GET"])
@@ -102,7 +101,7 @@ def register_success():
     csp=csp,
 )
 def login():
-    form = LoginForm()
+    form = forms.LoginForm()
     if form.validate_on_submit():
         username = form.username.data
         password = form.password.data
@@ -117,14 +116,14 @@ def login():
         else:
             return jsonify({"error": "Invalid username or password"}), 401
 
-    return render_template("login.html", form=form)
+    return render_template("register/login.html", form=form)
 
 
 @app.route("/login_success", methods=["GET"])
 def login_success():
     app_log.debug(f"Session state at /login_success: {session}")
     if "username" in session:
-        return f"Login successful, welcome {session['username']}. \r\n Return to <a href='/'>Home</a>"
+        return f"Login successful, welcome {session['username']}.  Return to <a href='/'>Home</a>"
     return redirect("/login")
 
 
@@ -152,18 +151,89 @@ def logout():
     return redirect("/")
 
 
-@app.route("/change-password", methods=["GET"])
+@app.route("/change-password", methods=["GET", "POST"])
 @csp_header(
     csp=csp,
 )
 def change_password():
-    if "username" in session:
-        username = session["username"]
-        new_password = request.form["new_password"]
-        if rm.changePW(username, new_password):
-            return jsonify({"message": "Password changed successfully"})
-        return jsonify({"error": "Password change failed"}), 500
-    return jsonify({"error": "No session found"}), 404
+    form = forms.chPWForm()
+    if form.validate_on_submit():
+        username = form.username.data
+        email = form.email.data
+        new_password = form.password.data
+
+        response, status_code = rm.changePW(username, email, new_password)
+        if status_code == 200:
+            session.clear()
+            session["username"] = username
+            csrf_token = generate_csrf()
+            app_log.debug(f"CSRF token after password change: {csrf_token}")
+            app_log.debug(f"Session state after password change: {session}")
+            return redirect("/change_password_success", 302)
+        else:
+            return jsonify(response), status_code
+
+    return render_template("register/change_password.html", form=form)
+
+
+global api_key
+api_key = r"sj5oJhfS9YoJHo0aOFSEjGYnboe6yPoF"
+
+
+@app.route("/create-post", methods=["GET", "POST"])
+@csp_header(
+    csp=csp,
+)
+def create_post():
+    form = forms.createPostForm()
+    if form.validate_on_submit():
+        developer = form.developer.data
+        project = form.project.data
+        start_time = form.start_time.data
+        end_time = form.end_time.data
+        diary_time = form.diary_time.data
+        time_worked = form.time_worked.data
+        repo = form.repo.data
+        dev_notes = form.dev_notes.data
+
+        response, status_code = requests.post(
+            "http://127.0.0.1:4000/add-post",
+            json={
+                "developer": developer,
+                "project": project,
+                "start_time": start_time,
+                "end_time": end_time,
+                "diary_time": diary_time,
+                "time_worked": time_worked,
+                "repo": repo,
+                "dev_notes": dev_notes,
+            },
+            headers={"x-api-key": api_key},
+        ).json()
+        if status_code == 200:
+            return redirect("/post_success", 302)
+        else:
+            return jsonify(response), status_code
+
+    return render_template("create_post.html", form=form)
+
+
+@app.route("/verify-otp", methods=["POST"])
+def verify_otp():
+    username = request.form.get("username")
+    otp = request.form.get("otp")
+    response, status_code = rm.verify_otp(username, otp)
+    return response, status_code
+
+
+def get_all_posts():
+    response, status_code = requests.post(
+        "http://127.0.0.1:4000/all-posts", headers={"x-api-key": api_key}
+    ).json()
+    if status_code == 200:
+        return response
+    else:
+        return f"Code {status_code}: {response}"
 
 
 if __name__ == "__main__":

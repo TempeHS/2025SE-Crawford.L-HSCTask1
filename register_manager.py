@@ -1,12 +1,13 @@
-from flask import Flask, jsonify, current_app, request
+from flask import Flask, jsonify, current_app, request, url_for
 import sqlite3 as sql
 from jsonschema import validate
 import os
 import bcrypt
-import random
-import time
-import getpass
 import uuid
+import pyotp
+import qrcode
+import io
+import base64
 
 app = Flask(__name__)
 app.config["DATABASE"] = "./data/register.db"
@@ -45,13 +46,63 @@ def create_user(username, email, password):
             break
         else:
             continue
+
+    # Generate OTP secret
+    otp_secret = pyotp.random_base32()
     cur.execute(
-        "INSERT INTO e50PMSBi_users (Wj89c_uuid, vX8hR_username, ajkSC_email, D9K66_password) VALUES (?, ?, ?, ?)",
-        (user_id, username, email, hashed_password.decode()),
+        "INSERT INTO e50PMSBi_users (Wj89c_uuid, vX8hR_username, ajkSC_email, D9K66_password, As7cn_otp_secret) VALUES (?, ?, ?, ?, ?)",
+        (user_id, username, email, hashed_password.decode(), otp_secret),
     )
     con.commit()
     con.close()
-    return jsonify({"message": "User created successfully"}), 201
+
+    # Generate OTP URI
+    otp_uri = pyotp.totp.TOTP(otp_secret).provisioning_uri(
+        name=email, issuer_name="YourAppName"
+    )
+
+    # Generate QR code
+    qr = qrcode.make(otp_uri)
+    buffered = io.BytesIO()
+    qr.save(buffered, format="PNG")
+    qr_code_data = base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+    return (
+        jsonify(
+            {
+                "message": "User created successfully",
+                "otp_secret": otp_secret,
+                "qr_code_data": qr_code_data,
+            }
+        ),
+        201,
+    )
+
+
+def verify_otp(username, otp):
+    if not os.path.exists(app.config["DATABASE"]):
+        print("Error: Database does not exist.")
+        return jsonify({"error": "Internal server error"}), 500
+
+    con = sql.connect(app.config["DATABASE"])
+    cur = con.cursor()
+    cur.execute(
+        "SELECT otp_secret FROM e50PMSBi_users WHERE vX8hR_username = ?", (username,)
+    )
+    user = cur.fetchone()
+    if not user:
+        print("Error: User not found.")
+        return jsonify({"error": "User not found."}), 404
+
+    otp_secret = user[0]
+    totp = pyotp.TOTP(otp_secret)
+    if totp.verify(otp):
+        return (
+            jsonify({"message": "OTP verified successfully", "username": username}),
+            200,
+        )
+    else:
+        return jsonify({"error": "Invalid OTP"}), 401
 
 
 def checkPW(username, password):
@@ -68,18 +119,18 @@ def checkPW(username, password):
     )
     user = cur.fetchone()
 
-    if user and bcrypt.checkpw(password.encode("utf-8"), user[0].encode("utf-8")):
-        print("Password matched")
-        con.close()
+    if not user:
+        print("Error: User not found.")
+        return False
+
+    hashed_password = user[0]
+    if bcrypt.checkpw(password.encode("utf-8"), hashed_password.encode("utf-8")):
         return True
     else:
-        time.sleep(round(random.uniform(0.2, 0.4), 3))  # Decoy delay
-        print("Password did not match")
-        con.close()
         return False
 
 
-def changePW():
+def changePW(username, email, password):
     if not os.path.exists(app.config["DATABASE"]):
         print("Error: Database does not exist.")
         return jsonify({"error": "Internal server error"}), 500
@@ -87,53 +138,45 @@ def changePW():
     con = sql.connect(app.config["DATABASE"])
     cur = con.cursor()
 
-    # Decoy delay before checking the database
-    time.sleep(round(random.uniform(0.2, 0.4), 3))
-
     cur.execute(
-        "SELECT vX8hR_username, nzqCh_DoB FROM e50PMSBi_users WHERE vX8hR_username = ? AND nzqCh_DoB = ?",
-        (username,),
+        "SELECT * FROM e50PMSBi_users WHERE vX8hR_username = ? AND ajkSC_email = ?",
+        (username, email),
     )
     user = cur.fetchone()
+    if not user:
+        print("Error: User not found.")
+        return jsonify({"error": "User not found."}), 404
 
-    while True:
-        if user:
-            time.sleep(round(random.uniform(0.2, 0.4), 3))
-            print("Username matched.")
-            newPass = request.form.get("new_password")
-            confirmPass = request.form.get("confirm_password")
+    salt = bcrypt.gensalt(rounds=14)
+    hashed_password = bcrypt.hashpw(password.encode("utf-8"), salt)
 
-            if not newPass or not confirmPass:
-                print("Error: New password or confirmation password not provided.")
-                return (
-                    jsonify(
-                        {"error": "New password or confirmation password not provided."}
-                    ),
-                    400,
-                )
-            if newPass != confirmPass:
-                time.sleep(
-                    round(random.uniform(0.2, 0.4), 3)
-                )  # Decoy delay before printing password mismatch
-                print("Password did not match.")
-                continue
+    cur.execute(
+        "UPDATE e50PMSBi_users SET D9K66_password = ? WHERE vX8hR_username = ? AND ajkSC_email = ?",
+        (hashed_password.decode(), username, email),
+    )
+    con.commit()
 
-            salt = bcrypt.gensalt(rounds=12)
-            hashed_password = bcrypt.hashpw(newPass.encode("utf-8"), salt)
-            cur.execute(
-                "UPDATE e50PMSBi_users SET D9K66_password = ? WHERE vX8hR_username = ?",
-                (hashed_password.decode(), username),
-            )
-            con.commit()
-            print("Password updated successfully.")
-            break
-        else:
-            time.sleep(
-                round(random.uniform(0.2, 0.4), 3)
-            )  # Decoy delay before printing username mismatch
-            print("Username did not match.")
-            break
     con.close()
+
+
+def get_uuid(username, email):
+    if not os.path.exists(app.config["DATABASE"]):
+        print("Error: Database does not exist.")
+        return jsonify({"error": "Internal server error"}), 500
+
+    con = sql.connect(app.config["DATABASE"])
+    cur = con.cursor()
+
+    cur.execute(
+        "SELECT Wj89c_uuid FROM e50PMSBi_users WHERE vX8hR_username = ? AND ajkSC_email = ?",
+        (username, email),
+    )
+    user = cur.fetchone()
+    if not user:
+        print("Error: User not found.")
+        return jsonify({"error": "User not found."}), 404
+
+    return user[0], 200
 
 
 if __name__ == "__main__":
@@ -150,9 +193,9 @@ if __name__ == "__main__":
                 """CREATE TABLE IF NOT EXISTS e50PMSBi_users (
                             Wj89c_uuid TEXT NOT NULL PRIMARY KEY,
                             vX8hR_username TEXT NOT NULL UNIQUE,
-                            email TEXT NOT NULL UNIQUE,
+                            ajkSC_email TEXT NOT NULL UNIQUE,
                             D9K66_password TEXT NOT NULL,
-                            nzqCh_DoB TEXT NOT NULL
+                            As7cn_otp_secret TEXT NOT NULL
                         )"""
             )
 
