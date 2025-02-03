@@ -8,8 +8,8 @@ import os
 from flask_wtf.csrf import generate_csrf
 from flask_talisman import Talisman, ALLOW_FROM
 
-import register_manager as rm
-import forms
+import pyfiles.register_manager as rm
+import pyfiles.forms as forms
 
 app_log = logging.getLogger(__name__)
 logging.basicConfig(
@@ -235,6 +235,8 @@ def get_all_posts():
     else:
         return f"Code {status_code}: {response}"
 
+
+from .templates.partials import header
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
