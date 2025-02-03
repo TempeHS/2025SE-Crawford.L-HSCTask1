@@ -3,8 +3,8 @@ from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import logging
-import post_manager as pm
-import register_manager as rm
+import pyfiles.post_manager as pm
+import pyfiles.register_manager as rm
 
 api_log = logging.getLogger(__name__)
 logging.basicConfig(
