@@ -5,16 +5,15 @@ from flask_limiter.util import get_remote_address
 import logging
 import pyfiles.post_manager as pm
 import pyfiles.register_manager as rm
+from dotenv import load_dotenv
 
+# Configure logging for api.py
 api_log = logging.getLogger(__name__)
-logging.basicConfig(
-    filename="api_security_log.log",
-    encoding="utf-8",
-    level=logging.DEBUG,
-    format="%(asctime)s %(message)s",
-)
-
-api_key = "sj5oJhfS9YoJHo0aOFSEjGYnboe6yPoF"
+file_handler = logging.FileHandler("api_security_log.log")
+file_handler.setLevel(logging.DEBUG)
+file_handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
+api_log.addHandler(file_handler)
+api_log.propagate = False
 
 api = Flask(__name__)
 api.secret_key = r"nEksrUMh4vnYXa9I52U7uUs4TX2mA1yk"  # Ensure you have a secret key for session management
@@ -29,23 +28,13 @@ limiter = Limiter(
 
 @api.before_request
 def log_request_info():
-    logging.debug(f"Request Headers: {request.headers}")
-    logging.debug(f"Request Body: {request.get_data()}")
+    api_log.debug(f"Request Headers: {request.headers}")
+    api_log.debug(f"Request Body: {request.get_data()}")
 
 
 def login_required(f):
     def wrap(*args, **kwargs):
         if "username" not in session:
-            return unauthorized_error("Unauthorized access")
-        return f(*args, **kwargs)
-
-    wrap.__name__ = f.__name__
-    return wrap
-
-
-def require_api_key(f):
-    def wrap(*args, **kwargs):
-        if request.headers.get("x-api-key") != api_key:
             return unauthorized_error("Unauthorized access")
         return f(*args, **kwargs)
 
@@ -68,27 +57,29 @@ def unauthorized_error(error):
 
 
 @api.route("/api", methods=["POST"])
-@require_api_key
 def get_data():
     data = get_request_data()
-    logging.info(f"Received data: {data}")
-    return jsonify(data)
+    api_log.info(f"Received data: {data}")
+    return jsonify(data), 200
 
 
 @api.route("/all-posts", methods=["POST"])
-@require_api_key
-# @login_required
+@login_required
 def get_all_posts():
-    return jsonify({"posts": "All posts"}), 200
+    api_log.info("Getting all posts")
+    all = pm.all_posts()
+    api_log.info(f"Posts: {all}")
+    return jsonify(all), 200
 
 
 @api.route("/add-post", methods=["POST"])
-@require_api_key
-# @login_required
+@login_required
 def add_post():
     data = get_request_data()
-    logging.info(f"Received data: {data}")
-    return jsonify(data), 201
+    uuid = data.get("uuid")
+    api_log.info(f"Received data: {data}")
+    result, status_code = pm.add_post(data, uuid)
+    return jsonify(result), status_code
 
 
 if __name__ == "__main__":

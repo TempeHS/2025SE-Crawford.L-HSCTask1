@@ -8,6 +8,11 @@ import pyotp
 import qrcode
 import io
 import base64
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config["DATABASE"] = "./data/register.db"
@@ -157,25 +162,28 @@ def changePW(username, email, password):
     con.commit()
 
     con.close()
+    return jsonify({"message": "Password changed successfully"}), 200
 
 
-def get_uuid(username, email):
+def get_uuid(username):
     if not os.path.exists(app.config["DATABASE"]):
-        print("Error: Database does not exist.")
+        logger.error("Database does not exist.")
         return jsonify({"error": "Internal server error"}), 500
 
     con = sql.connect(app.config["DATABASE"])
     cur = con.cursor()
 
+    logger.debug(f"Looking for uuid with username: {username}")
     cur.execute(
-        "SELECT Wj89c_uuid FROM e50PMSBi_users WHERE vX8hR_username = ? AND ajkSC_email = ?",
-        (username, email),
+        "SELECT Wj89c_uuid FROM e50PMSBi_users WHERE vX8hR_username = ?",
+        (username,),
     )
     user = cur.fetchone()
     if not user:
-        print("Error: User not found.")
+        logger.error("User not found.")
         return jsonify({"error": "User not found."}), 404
 
+    logger.debug(f"Found user: {user}")
     return user[0], 200
 
 
