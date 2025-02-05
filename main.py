@@ -1,4 +1,13 @@
-from flask import Flask, redirect, render_template, request, jsonify, session, g
+from flask import (
+    Flask,
+    redirect,
+    render_template,
+    request,
+    jsonify,
+    session,
+    g,
+    Response,
+)
 from flask_session import Session
 import requests
 from flask_wtf import CSRFProtect
@@ -12,12 +21,11 @@ import pyfiles.register_manager as rm
 import pyfiles.forms as forms
 
 app_log = logging.getLogger(__name__)
-logging.basicConfig(
-    filename="main_security_log.log",
-    encoding="utf-8",
-    level=logging.DEBUG,
-    format="%(asctime)s %(message)s",
-)
+file_handler = logging.FileHandler("main_security_log.log")
+file_handler.setLevel(logging.DEBUG)
+file_handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
+app_log.addHandler(file_handler)
+app_log.propagate = False
 
 app = Flask(__name__)
 csrf = CSRFProtect(app)
@@ -25,7 +33,7 @@ app.secret_key = b"6HlQfWhu03PttohW;apl"
 
 # Flask-Session configuration
 app.config["SESSION_TYPE"] = "filesystem"
-app.config["SECRET_KEY"] = os.urandom(24).hex()
+app.config["SECRET_KEY"] = b"6HlQfWhu03PttohW;apl"
 app.config["SESSION_PERMANENT"] = False
 app.config["PERMANENT_SESSION_LIFETIME"] = 3600  # 1 hour
 Session(app)
@@ -34,7 +42,13 @@ Session(app)
 csp = {
     "default-src": ["'self'"],
     "style-src": ["'self'", "https://cdn.jsdelivr.net/"],
-    "script-src": ["'self'", "https://cdn.jsdelivr.net/", "'nonce-{nonce}'"],
+    "script-src": [
+        "'self'",
+        "https://cdn.jsdelivr.net/",
+        "'nonce-{nonce}'",
+        "'strict-dynamic'",
+        "'unsafe-inline'",
+    ],
     "img-src": ["'self'", "data:"],
     "media-src": ["'self'"],
     "font-src": ["'self'", "data:"],
@@ -44,6 +58,7 @@ csp = {
     "frame-src": ["'none'"],
     "form-action": ["'self'"],
     "manifest-src": ["'self'"],
+    "base-uri": ["'self'"],
 }
 
 talisman = Talisman(
@@ -83,7 +98,7 @@ def register():
         password = request.form.get("password")
         response, status_code = rm.create_user(username, email, password)
         if status_code == 201:
-            qr_code_data = response.json.get("qr_code_data")
+            qr_code_data = response.json().get("qr_code_data")
             return render_template(
                 "register/register_success.html", qr_code_data=qr_code_data
             )
@@ -145,7 +160,6 @@ def get_session():
 
 @app.route("/logout", methods=["GET"])
 def logout():
-    app_log.debug(f"Session state before logout: {session}")
     session.pop("username", None)
     app_log.debug(f"Session state after logout: {session}")
     return redirect("/")
@@ -176,8 +190,29 @@ def change_password():
     return render_template("register/change_password.html", form=form)
 
 
-global api_key
-api_key = r"sj5oJhfS9YoJHo0aOFSEjGYnboe6yPoF"
+@app.route("/verify-otp", methods=["POST"])
+def verify_otp():
+    username = request.form.get("username")
+    otp = request.form.get("otp")
+    response, status_code = rm.verify_otp(username, otp)
+    return response, status_code
+
+
+@app.route("/all-posts", methods=["GET"])
+@csp_header(
+    csp=csp,
+)
+def all_posts():
+    response = requests.post("http://127.0.0.1:4000/all-posts")
+    status_code = response.status_code
+    if status_code == 200:
+        return Response(
+            response.content,
+            status=response.status_code,
+            mimetype=response.headers["Content-Type"],
+        )
+    else:
+        return f"Code {status_code}: {response}"
 
 
 @app.route("/create-post", methods=["GET", "POST"])
@@ -185,6 +220,7 @@ api_key = r"sj5oJhfS9YoJHo0aOFSEjGYnboe6yPoF"
     csp=csp,
 )
 def create_post():
+    uuid = rm.get_uuid(session.get("username"))
     form = forms.createPostForm()
     if form.validate_on_submit():
         developer = form.developer.data
@@ -196,9 +232,10 @@ def create_post():
         repo = form.repo.data
         dev_notes = form.dev_notes.data
 
-        response, status_code = requests.post(
+        response = requests.post(
             "http://127.0.0.1:4000/add-post",
             json={
+                "uuid": uuid,
                 "developer": developer,
                 "project": project,
                 "start_time": start_time,
@@ -208,35 +245,20 @@ def create_post():
                 "repo": repo,
                 "dev_notes": dev_notes,
             },
-            headers={"x-api-key": api_key},
-        ).json()
+        )
+        status_code = response.status_code
+        try:
+            response_json = response.json()
+        except requests.exceptions.JSONDecodeError:
+            response_json = {"error": "Invalid response from server"}
+
         if status_code == 200:
-            return redirect("/post_success", 302)
+            return jsonify(response_json), status_code
         else:
-            return jsonify(response), status_code
+            return jsonify(response_json), status_code
 
-    return render_template("create_post.html", form=form)
+    return render_template("posts/create_post.html", form=form)
 
-
-@app.route("/verify-otp", methods=["POST"])
-def verify_otp():
-    username = request.form.get("username")
-    otp = request.form.get("otp")
-    response, status_code = rm.verify_otp(username, otp)
-    return response, status_code
-
-
-def get_all_posts():
-    response, status_code = requests.post(
-        "http://127.0.0.1:4000/all-posts", headers={"x-api-key": api_key}
-    ).json()
-    if status_code == 200:
-        return response
-    else:
-        return f"Code {status_code}: {response}"
-
-
-from .templates.partials import header
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)

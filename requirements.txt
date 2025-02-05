@@ -11,7 +11,7 @@ bcrypt
 flask-talisman
 email-validator
 flask-session
-pytest
 pyotp
 qrcode
 pillow
+python-dotenv
