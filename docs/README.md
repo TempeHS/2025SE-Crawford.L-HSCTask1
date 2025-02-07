@@ -4,6 +4,7 @@ HSC Task 1 for Crawford L
 
 # For Mr. Jones
 
+Run `python main.py` and `python api.py` in separate terminals.
 -   Username: `BenJones`
 -   Password: `PowerP@ss#1`
 -   Email: `benjamin.jones21@det.nsw.edu.au`
