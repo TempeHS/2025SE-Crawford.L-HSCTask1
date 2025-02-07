@@ -20,6 +20,7 @@ def all_posts():
     return [dict(zip(columns, row)) for row in rows]
 
 
+
 def add_post(data, uuid):
     con = sql.connect(app.config["DATABASE"])
     cur = con.cursor()

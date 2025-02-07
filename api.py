@@ -54,6 +54,7 @@ def get_data():
 
 
 @api.route("/all-posts", methods=["POST"])
+
 def get_all_posts():
     api_log.info("Getting all posts")
     all = pm.all_posts()
