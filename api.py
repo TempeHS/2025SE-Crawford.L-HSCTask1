@@ -72,4 +72,4 @@ def add_post():
 
 
 if __name__ == "__main__":
-    api.run(debug=True, host="0.0.0.0", port=4000)
+    api.run(debug=False, host="0.0.0.0", port=4000)
