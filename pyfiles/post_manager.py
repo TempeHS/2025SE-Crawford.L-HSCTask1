@@ -14,9 +14,10 @@ def all_posts():
     con = sql.connect(app.config["DATABASE"])
     cur = con.cursor()
     cur.execute("SELECT * FROM AWCuWion_posts")
-    posts = cur.fetchall()
+    rows = cur.fetchall()
+    columns = [description[0] for description in cur.description]
     con.close()
-    return posts
+    return [dict(zip(columns, row)) for row in rows]
 
 
 def add_post(data, uuid):

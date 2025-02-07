@@ -13,12 +13,14 @@ class RegistrationForm(FlaskForm):
 class LoginForm(FlaskForm):
     username = StringField("Username", validators=[DataRequired()])
     password = PasswordField("Password", validators=[DataRequired()])
+    one_time_code = StringField("One Time Code", validators=[DataRequired()])
     submit = SubmitField("Login")
 
 
 class chPWForm(FlaskForm):
     username = StringField("Username", validators=[DataRequired()])
     email = StringField("Email", validators=[DataRequired(), Email()])
+    one_time_code = StringField("One Time Code", validators=[DataRequired()])
     password = PasswordField("Password", validators=[DataRequired()])
     submit = SubmitField("Change Password")
 

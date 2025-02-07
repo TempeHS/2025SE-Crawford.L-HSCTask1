@@ -32,16 +32,6 @@ def log_request_info():
     api_log.debug(f"Request Body: {request.get_data()}")
 
 
-def login_required(f):
-    def wrap(*args, **kwargs):
-        if "username" not in session:
-            return unauthorized_error("Unauthorized access")
-        return f(*args, **kwargs)
-
-    wrap.__name__ = f.__name__
-    return wrap
-
-
 def get_request_data():
     if request.content_type == "application/json":
         return request.get_json()
@@ -64,7 +54,6 @@ def get_data():
 
 
 @api.route("/all-posts", methods=["POST"])
-@login_required
 def get_all_posts():
     api_log.info("Getting all posts")
     all = pm.all_posts()
@@ -73,7 +62,6 @@ def get_all_posts():
 
 
 @api.route("/add-post", methods=["POST"])
-@login_required
 def add_post():
     data = get_request_data()
     uuid = data.get("uuid")
