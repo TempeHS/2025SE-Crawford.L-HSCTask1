@@ -98,7 +98,9 @@ def register():
         password = request.form.get("password")
         response, status_code = rm.create_user(username, email, password)
         if status_code == 201:
-            qr_code_data = response.json().get("qr_code_data")
+
+            response_json = response.get_json()
+            qr_code_data = response_json.get("qr_code_data")
             return render_template(
                 "register/register_success.html", qr_code_data=qr_code_data
             )
@@ -206,11 +208,8 @@ def all_posts():
     response = requests.post("http://127.0.0.1:4000/all-posts")
     status_code = response.status_code
     if status_code == 200:
-        return Response(
-            response.content,
-            status=response.status_code,
-            mimetype=response.headers["Content-Type"],
-        )
+
+        return jsonify(response.json()), status_code
     else:
         return f"Code {status_code}: {response}"
 
